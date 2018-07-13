@@ -45,7 +45,7 @@ class Port:
             "port": self.port,
             "service_sof": self.service_sof,
             "version": self.version,
-            #"banner": str(base64.b64encode(self.banner.encode('utf-8')))[2:-1]
+            # "banner": str(base64.b64encode(self.banner.encode('utf-8')))[2:-1]
             "url": self.url,
             "protocol": self.protocol,
             "headers": self.headers
@@ -108,17 +108,30 @@ def zmap_zgrab(port):
         tls = '--tls'
     else:
         tls = ''
-    process = os.popen("route | grep '0.0.0.0' | grep '128.0.0.0' | awk '{print $8}' ") # return file
-    output = process.read()
-    process.close()
+    if platform == '1':
+        process = os.popen("route | grep '0.0.0.0' | grep '128.0.0.0' | awk '{print $8}' ")  # return file
+        output = process.read()
+        process.close()
+        outif_zmap = ' -i ' + output[:-1]
+        outif_zgrab = ' -interface ' + output[:-1]
+    else:
+        outif_zgrab = outif_zmap = ''
     command = (
-            'zmap -p {port} -i '+output[:-1]+' --whitelist-file {target} --output-module=csv --output-fields=* -r 1000 | '
+        'zmap -p {port}{outif_zmap} --whitelist-file={target} --output-module=csv --output-fields=* -r 1000 | '
         'ztee results.csv | '
-        'zgrab --port {port} {tls} --http="/" -interface '+output[:-1]+' --output-file={output}'
-    ).format(port=str(port), target=config.TARGET_LIST, output=json_file, tls=tls)
+        'zgrab --port {port} {tls} --http="/"{outif_zgrab} --output-file={output}'
+    ).format(
+        port=str(port),
+        outif_zmap=outif_zmap,
+        target=config.TARGET_LIST,
+        output=json_file,
+        tls=tls,
+        outif_zgrab=outif_zgrab
+    )
     print('command: ' + command)
     subprocess.call([command], shell=True)
     print(command)
+
 
 #  json提取, 过滤未开启http服务的ip
 def get_base_info(port):
@@ -154,7 +167,7 @@ def get_base_info(port):
             service_sof = ''
             version = ''
 
-        #server_port = Port(port, service_sof, version, json.dumps(line))
+        # server_port = Port(port, service_sof, version, json.dumps(line))
         server_port = Port(port,
                            service_sof,
                            version,
@@ -173,8 +186,8 @@ def get_base_info(port):
 def writeandnmap(ip_list):
     with open(config.NMAP_LIST, 'w') as f:
         f.write(ip_list)
-    command = ('nmap -O -Pn -sS -p 8000,443,80,8080 -iL {input_file} -oX {output}').format(input_file=config.NMAP_LIST,
-                                                                                   output=config.NMAP_XML)
+    command = 'nmap -O -Pn -sS -p 8000,443,80,8080 -iL {input_file} -oX {output}'.format(input_file=config.NMAP_LIST,
+                                                                                         output=config.NMAP_XML)
     subprocess.call([command], shell=True)
     if os.path.getsize(config.NMAP_XML) > 0:
         with open(config.NMAP_XML, 'r') as f:
@@ -199,7 +212,7 @@ def writeandnmap(ip_list):
             server_list[ip].os_version = os_version
     else:
         pass
-    
+
 
 # nmap探测设备种类和操作系统
 def nmap():
@@ -208,12 +221,12 @@ def nmap():
     i = 0
     for ip in server_list:
         ip_list += (ip + '\n')
-        i=i+1
-        if i == 50 :
+        i = i + 1
+        if i == 50:
             writeandnmap(ip_list)
             ip_list = ''
-            i=0
-    if i!=0 :
+            i = 0
+    if i != 0:
         writeandnmap(ip_list)
 
 
@@ -221,11 +234,10 @@ def nmap():
 def write_result_on_whitelist_server():
     result_file_name = '{task_id}-{tag}.result'
     for host in server_list:
-        result = server_list[host].to_dict()
         content = {
             'task_id': task_id,
             'task_name': task_name,
-            'result': result
+            'result': server_list[host].to_dict()
         }
         with open(os.path.join(
                 config.RESULT_FILE,
@@ -269,16 +281,16 @@ if __name__ == '__main__':
     #     sys.exit(-1)
     # 判断网络
     is_connect.Update()
-    #try:
+    # try:
     #    ex_ip = urllib2.urlopen("http://ip.6655.com/ip.aspx").read().decode()
-    #except:
+    # except:
     #    ex_ip = ''
-    #if ex_ip is '':
+    # if ex_ip is '':
     #    log.task_fail()
     #    log.write_result_fail()
     #    e = 'Can not get external IP address.'
-     #   print(e)
-     #   log.write_error_to_appstatus(e, 2)
+    #   print(e)
+    #   log.write_error_to_appstatus(e, 2)
     # 获取配置
     log.get_conf()
     try:
@@ -289,16 +301,16 @@ if __name__ == '__main__':
         log.write_error_to_appstatus(str(e), -1)
     # 计次初始化
     processer = process.processManager()
-    prtaskid=task_id.split("-")
+    prtaskid = task_id.split("-")
     try:
-        prtaskid=prtaskid[-1]
+        prtaskid = prtaskid[-1]
     except:
-        prtaskid=task_id
+        prtaskid = task_id
     processer.set_taskid(prtaskid, pro_uuid)
     # 执行任务
     log.task_run()
     try:
-        #subprocess.call(['wget http://www.baidu.com'], shell=True)
+        # subprocess.call(['wget http://www.baidu.com'], shell=True)
         for port in config.PORT_SET:
             zmap_zgrab(port)
             get_base_info(port)
