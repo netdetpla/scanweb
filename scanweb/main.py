@@ -28,6 +28,8 @@ platform = ''
 extra_info = ''
 # 结果列表
 server_list = {}
+sys.stdout = open(sys.stdout.fileno(), mode='w', encoding='utf8', buffering=1)
+
 
 
 # 端口类
@@ -35,7 +37,7 @@ class Port:
     def __init__(self, port, service_sof, version, url, protocol, headers):
         self.port = port
         self.service_sof = service_sof
-        self.version = service_sof
+        self.version = version
         self.url = url
         self.protocol = protocol
         self.headers = headers
@@ -82,21 +84,21 @@ def get_config():
     global extra_info
 
     with open(config.CONFIG_FILE, 'r') as f:
-        task = str(base64.b64decode(f.read())).split(';')
-        print(task)
-        task_id = task[0][2:]
-        # subtask_id = task[1]
-        pro_uuid = task[5][:-1]
-        task_name = task[1]
-        platform = task[2]
-        extra_info = task[3]
-        ip_list = task[4].split(',')
-        with open(config.TARGET_LIST, 'w') as dns_f:
-            dns_f.write('\n'.join(ip_list))
-        if os.path.getsize(config.TARGET_LIST) <= 0:
-            e = 'No target IP.'
-            log.get_conf_fail()
-            log.write_error_to_appstatus(e, 3)
+        task = base64.b64decode(f.read()).decode('utf-8').split(';')
+    print(task)
+    task_id = task[0]
+    # subtask_id = task[1]
+    pro_uuid = task[5]
+    task_name = task[1]
+    platform = task[2]
+    extra_info = task[3]
+    ip_list = task[4].split(',')
+    with open(config.TARGET_LIST, 'w') as dns_f:
+        dns_f.write('\n'.join(ip_list))
+    if os.path.getsize(config.TARGET_LIST) <= 0:
+        e = 'No target IP.'
+        log.get_conf_fail()
+        log.write_error_to_appstatus(e, 3)
 
 
 # zmap + zgrab
@@ -160,9 +162,16 @@ def get_base_info(port):
         # 端口对应信息
         try:
             service_temp = line['data']['http']['response']['headers']['server'][0]
-            service = service_temp[:service_temp.find(' ')]
-            service_sof = service[:service.find('/')]
-            version = service[service.find('/'):]
+            if service_temp.find(' ') >= 0:
+                service = service_temp[:service_temp.find(' ')]
+            else:
+                service = service_temp
+            if service.find('/') >= 0:
+                service_sof = service[:service.find('/')]
+                version = service[service.find('/'):]
+            else:
+                service_sof = service
+                version = ''
         except KeyError:
             service_sof = ''
             version = ''
@@ -239,23 +248,23 @@ def write_result_on_whitelist_server():
             'task_name': task_name,
             'result': server_list[host].to_dict()
         }
-        with open(os.path.join(
+        with codecs.open(os.path.join(
                 config.RESULT_FILE,
                 result_file_name.format(task_id=task_id, tag=host)
-        ), 'w') as f:
-            json.dump(content, f)
+        ), 'w', 'utf-8') as f:
+            json.dump(content, f, ensure_ascii=False)
 
 
 def write_result_on_cloud_server():
     result = []
     for host in server_list:
         result.append(server_list[host].to_dict())
-    with open(os.path.join(config.RESULT_FILE, task_id + '.result'), 'w') as f:
+    with codecs.open(os.path.join(config.RESULT_FILE, task_id + '.result'), 'w', 'utf-8') as f:
         json.dump({
             'task_id': task_id,
             'task_name': task_name,
             'result': result
-        }, f)
+        }, f, ensure_ascii=False)
 
 
 if __name__ == '__main__':
