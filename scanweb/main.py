@@ -177,12 +177,16 @@ def get_base_info(port):
             version = ''
 
         # server_port = Port(port, service_sof, version, json.dumps(line))
+        try:
+            headers = line['data']['http']['response']['headers']
+        except KeyError:
+            headers = ''
         server_port = Port(port,
                            service_sof,
                            version,
                            str(line['data']['http']['response']['request']['url']),
                            str(line['data']['http']['response']['protocol']),
-                           str(line['data']['http']['response']['headers']))
+                           headers)
         ip = line['ip']
         # 更新ip列表
         try:
